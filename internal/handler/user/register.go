@@ -19,19 +19,18 @@ import (
 var Validate = validator.New()
 
 func Register(w http.ResponseWriter, r *http.Request) {
-
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
 	defer cancel()
 
 	var user model.User
 	if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		util.HandleError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	validationErr := Validate.Struct(user)
 	if validationErr != nil {
-		http.Error(w, validationErr.Error(), http.StatusBadRequest)
+		util.HandleError(w, validationErr.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -39,7 +38,7 @@ func Register(w http.ResponseWriter, r *http.Request) {
 	user.Password = &password
 
 	if util.IsValidPhoneNumber(*user.Phone) {
-		http.Error(w, "invalid phone number", http.StatusBadRequest)
+		util.HandleError(w, "invalid phone number", http.StatusBadRequest)
 		return
 	}
 	// if util.IsValidEmail(*user.Email) {
@@ -49,18 +48,18 @@ func Register(w http.ResponseWriter, r *http.Request) {
 	count, err := database.UserCollection.CountDocuments(ctx, bson.M{"email": user.Email})
 	if err != nil {
 		log.Panic(err)
-		http.Error(w, "error occurred while checking for the email", http.StatusInternalServerError)
+		util.HandleError(w, "error occurred while checking for the email", http.StatusInternalServerError)
 		return
 	}
 	count, err = database.UserCollection.CountDocuments(ctx, bson.M{"phone": user.Phone})
 	if err != nil {
 		log.Panic(err)
-		http.Error(w, "error occurred while checking for the phone number", http.StatusInternalServerError)
+		util.HandleError(w, "error occurred while checking for the phone number", http.StatusInternalServerError)
 		return
 	}
 
 	if count > 0 {
-		http.Error(w, "This email or phone number is already in use", http.StatusInternalServerError)
+		util.HandleError(w, "This email or phone number is already in use", http.StatusInternalServerError)
 		return
 	}
 
@@ -76,7 +75,7 @@ func Register(w http.ResponseWriter, r *http.Request) {
 	resultInsertion, insertErr := database.UserCollection.InsertOne(ctx, user)
 	if insertErr != nil {
 		msg := fmt.Sprint("User was not created")
-		http.Error(w, msg, http.StatusInternalServerError)
+		util.HandleError(w, msg, http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")

@@ -6,10 +6,13 @@ import (
 	"crumbs/internal/model"
 	"crumbs/internal/util"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type LoginSuccesssResponse struct {
@@ -27,11 +30,11 @@ func Login(w http.ResponseWriter, r *http.Request) {
 	var foundUser model.User
 
 	if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		fmt.Println(err)
+		util.HandleError(w, "Invalid request payload", http.StatusBadRequest)
 		return
 	}
 
-	// Xác định phương thức đăng nhập và truy vấn dựa trên đó
 	var query bson.M
 
 	switch r.URL.Path {
@@ -50,29 +53,32 @@ func Login(w http.ResponseWriter, r *http.Request) {
 	// Thực hiện truy vấn để kiểm tra tính đúng đắn của thông tin đăng nhập
 	err := database.UserCollection.FindOne(ctx, query).Decode(&foundUser)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			// Người dùng không được tìm thấy
+			util.HandleError(w, "User not found", http.StatusNotFound)
+		} else {
+			// Xử lý lỗi nội bộ
+			util.HandleError(w, "Internal Server Error", http.StatusInternalServerError)
+		}
 		return
 	}
 	// fmt.Println(*user.Password)
 
-	passwordIsValid, msg := util.VerifyPassword(*user.Password, *foundUser.Password)
+	passwordIsValid, msg := util.VerifyPassword(*user.Password, *foundUser.Password, r.URL.Path)
 	if !passwordIsValid {
-		http.Error(w, msg, http.StatusUnauthorized)
-		return
-	}
-
-	if foundUser.Email == nil {
-		http.Error(w, "user not found", http.StatusInternalServerError)
+		util.HandleError(w, msg, http.StatusUnauthorized)
 		return
 	}
 
 	token, refreshToken, _ := util.GenerateAllTokens(*foundUser.Email, *foundUser.Phone, *foundUser.First_name, *foundUser.Last_name, *foundUser.User_type, foundUser.User_id)
 	util.UpdateAllTokens(token, refreshToken, foundUser.User_id)
+	// fmt.Println(foundUser.Token)
 
-	// Decode and return founduser from database
+	// Decode and return founduser (updated) from database
 	err = database.UserCollection.FindOne(ctx, bson.M{"user_id": foundUser.User_id}).Decode(&foundUser)
+	// fmt.Println(foundUser.Token)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		util.HandleError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
