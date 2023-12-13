@@ -2,6 +2,7 @@ package util
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -31,6 +32,8 @@ var userCollection *mongo.Collection = database.OpenCollection(database.Client, 
 var SECRET_KEY string = os.Getenv("SECRET_KEY")
 
 func GenerateAllTokens(email string, phone string, firstName string, lastName string, userType string, uid string) (signedToken string, signedRefreshToken string, err error) {
+	// fmt.Println(SECRET_KEY)
+
 	claims := &SignedDetails{
 		Email:      email,
 		Phone:      phone,
@@ -87,6 +90,22 @@ func ValidateToken(signedToken string) (claims *SignedDetails, msg string) {
 		return
 	}
 	return claims, msg
+}
+
+func ParseTokenToUserType(tokenString string) (userType string, err error) {
+	token, err := jwt.ParseWithClaims(tokenString, &SignedDetails{}, func(token *jwt.Token) (interface{}, error) {
+		return []byte(SECRET_KEY), nil
+	})
+
+	if err != nil {
+		return "", err
+	}
+
+	if claims, ok := token.Claims.(*SignedDetails); ok && token.Valid {
+		return claims.User_type, nil
+	}
+
+	return "", errors.New("Invalid token or unable to extract User_type")
 }
 
 func UpdateAllTokens(signedToken string, signedRefreshToken string, userId string) {
