@@ -6,3 +6,4 @@ import (
 
 var UserCollection *mongo.Collection = OpenCollection(Client, "user")
 var PostCollection *mongo.Collection = OpenCollection(Client, "post")
+var CommentCollection *mongo.Collection = OpenCollection(Client, "comment")

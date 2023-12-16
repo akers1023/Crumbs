@@ -35,8 +35,7 @@ func GetUsers(w http.ResponseWriter, r *http.Request) {
 		page = 1
 	}
 
-	startIndex := (page - 1) * recordPerPage
-	startIndex, err = strconv.Atoi(vars["startIndex"])
+	startIndex, err := strconv.Atoi(vars["startIndex"])
 
 	matchStage := bson.D{{Key: "$match", Value: bson.D{{}}}}
 	groupStage := bson.D{{Key: "$group", Value: bson.D{
